@@ -1,5 +1,11 @@
+
+resource "google_project_service" "monitoring_api" {
+  project = "the-byway-432710-h6"
+  service = "monitoring.googleapis.com"
+}
+
 resource "google_monitoring_notification_channel" "email_channel" {
-  display_name = "Disk utilization crossed threshold"
+  display_name = "Email Notification Channel"
   type         = "email"
 
   labels = {
@@ -7,31 +13,35 @@ resource "google_monitoring_notification_channel" "email_channel" {
   }
 }
 
+resource "google_monitoring_alert_policy" "cpu_alert" {
+  display_name = "High CPU Utilization Alert for monitoring"
+  combiner = "OR" 
+  depends_on = [google_project_service.monitoring_api]
 
-resource "google_monitoring_alert_policy" "memory_alert" {
-  display_name        = "Memory Utilization Alert"
-  #notification_channel = "Disk utilization crossed threshold"  # Replace with your notification channel ID
-  combiner = "OR"
   conditions {
-    display_name = "Memory Utilization High"
+    display_name = "CPU utilization exceeds 50% for monitoring"
+
     condition_threshold {
-      filter = "metric.type=\"compute.googleapis.com/instance/disk/write_bytes_count\" AND resource.type=\"gce_instance\" AND resource.labels.instance_id=\"7771777848152174577\""
+      filter = "resource.type = \"gce_instance\" AND metric.type = \"compute.googleapis.com/instance/cpu/utilization\""
       comparison = "COMPARISON_GT"
-      threshold_value = 40
+      threshold_value = 0.5  # 50% utilization
       duration = "60s"
+
       aggregations {
         alignment_period = "60s"
-        per_series_aligner = "ALIGN_RATE"
+        per_series_aligner = "ALIGN_MEAN"
       }
     }
+
+     # Use "OR" or "AND" based on your requirements
   }
+
+  notification_channels = [google_monitoring_notification_channel.email_channel.id]
 
   /*alert_strategy {
     notification_rate_limit {
-      period = "60s"
+      period              = "60s"
+    #  allowed_notifications = 3
     }
   }*/
-
-  enabled = true
-  notification_channels = [google_monitoring_notification_channel.email_channel.id]
 }
